@@ -15,7 +15,7 @@ from boto.s3.connection import S3Connection
 
 class S3Uploader(object):
 	def __init__(self, s3conf, bucketname, threads=1, chunksize_mb=5, attempt_limit=5, timeout=10800):
-		self.bucketname = bucketname # s3 bucket name
+		self.bucketname = self._get_bucket(bucketname) # s3 bucket name
 		self.chunksize = int(chunksize_mb * 2**20) # get chunksize in bytes
 		self.attempt_limit = attempt_limit # default 5 attempts per chunk
 		self.timeout = timeout # default 3 hours (10800 seconds)
@@ -23,6 +23,11 @@ class S3Uploader(object):
 			raise ValueError("threads must be > 0")
 		self.threads = threads # number of parallel threads for upload
 		self.s3conf = s3conf # expects s3conf as `dict` with keys "aws_access_key_id" and "aws_secret_access_key" defined
+
+	def _check_bucket(self, bucketname):
+		conn = S3Connection(**self.s3conf)
+		bucket = conn.get_bucket(bucketname)
+		
 
 	def kill_old_multipart_uploads(self):
 		conn = S3Connection(**self.s3conf)
@@ -107,7 +112,12 @@ class S3Uploader(object):
 				result = []
 				try:
 					for chunk in fchunks:
-						result.append(self._upload_part(chunk))
+						part_result = self._upload_part(chunk)
+						result.append(part_result) # log to results
+						if part_result[1] == False: # if upload fails, break loop
+							logging.info("%s failed to upload. Cancelling Multipart Upload." % keyname)
+							mp.cancel_upload()
+							return False
 				except Exception as exc:
 					logging.info("%s failed to upload. Cancelling Multipart Upload." % keyname)
 					mp.cancel_upload()
@@ -143,8 +153,12 @@ class S3Uploader(object):
 					logging.info("%s Upload Complete!" % keyname )
 				except Exception as exc:
 					mp.cancel_upload()
-					logging.info("%s failed to upload. Cancelling Multipart Upload." % keyname)
+					logging.info("%s failed to upload compltely. Cancelling Multipart Upload." % keyname)
 					return False
+			else:
+				mp.cancel_upload()
+				logging.info("%s failed to upload completely. Cancelling Multipart Upload." % keyname)
+				return False
 
 		end_time = time.time()
 		upload_speed_mbps = ( fsize / 2 **20 ) / ( end_time - start_time )
