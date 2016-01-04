@@ -18,7 +18,7 @@ def redshift_connection(conf):
 	return pg2.connect( **conf )
 
 
-def copy_from_s3_to_redshift(conn, s3conf, bucketname, keyname, table, delimiter="||", quote_char="\"", na_string=None, header_rows=0, date_format="auto", compression=None, not_run=False):
+def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter="||", quote_char="\"", na_string=None, header_rows=0, date_format="auto", compression=None, not_run=False):
 
 	# expects s3conf as `dict` with keys "aws_access_key_id" and "aws_secret_access_key" defined
 	# e.g. {"aws_access_key_id":"ASDFHAS", "aws_secret_access_key":"ASBDSKJA"}
@@ -53,7 +53,7 @@ def copy_from_s3_to_redshift(conn, s3conf, bucketname, keyname, table, delimiter
 		data["quote_char"] = quote_char
 
 	if compression is not None:
-		if compression.upper() in ("GZIP","LZOP"):
+		if compression.upper() in set(("GZIP","LZOP")):
 			sql += compression.upper() +" "
 
 	cur = conn.cursor()
@@ -64,7 +64,7 @@ def copy_from_s3_to_redshift(conn, s3conf, bucketname, keyname, table, delimiter
 		conn.commit()
 		return True
 
-def redshift_delete_by_keys(conn, table, date_column="date", start_date=None, end_date=None, date_format="%Y-%m-%d", window=30, not_run=False):
+def delete_by_date(conn, table, date_column="date", start_date=None, end_date=None, date_format="%Y-%m-%d", window=30, not_run=False):
 	"""method to delete old entries from redshift by date, dates are inclusive, default span is 31 days ago to 1 day ago"""
 
 	if end_date is None:
@@ -89,23 +89,30 @@ def redshift_delete_by_keys(conn, table, date_column="date", start_date=None, en
 		conn.commit()
 		return True
 
-def redshift_upsert(conn, s3conf, bucketname, keyname, table="placement", delimiter="\t", quote_char="\"", na_string="NA"):
+def upsert(conn, s3conf, bucketname, keyname, table, unique_key="id", delimiter="\t", quote_char="\"", na_string="NA"):
 
 	update_table = table+"_updates"
 
+	# create temp table in Redshift
+	data = {
+		"table": AsIs(table),
+		"update_table": AsIs(update_table),
+		"unique_key": AsIs(unique_key) }
+	
 	sql = """DROP TABLE IF EXISTS %(update_table)s; CREATE TEMP TABLE %(update_table)s (LIKE %(table)s);"""
-	data = {"table": AsIs(table),"update_table": AsIs(update_table) }
 
 	cur = conn.cursor()
 	cur.execute( sql, data )
 
-	copy_from_s3_to_redshift( conn=conn, s3conf=s3conf, bucketname=bucketname, keyname=keyname, table=update_table, delimiter=delimiter, quote_char=quote_char, na_string=na_string)
+	# insert data into new temp table
+	copy_from_s3( conn=conn, s3conf=s3conf, bucketname=bucketname, keyname=keyname, table=update_table, delimiter=delimiter, quote_char=quote_char, na_string=na_string)
 
+	# upsert data from temp table into original table, drop temp table
 	sql = """
 	begin transaction;
 	DELETE FROM %(table)s
 	USING %(update_table)s
-	WHERE %(table)s.id = %(update_table)s.id;
+	WHERE %(table)s.%(unique_key)s = %(update_table)s.%(unique_key)s;
 
 	INSERT INTO %(table)s (
 		SELECT * FROM %(update_table)s
@@ -113,4 +120,5 @@ def redshift_upsert(conn, s3conf, bucketname, keyname, table="placement", delimi
 	end transaction;
 	DROP TABLE %(update_table)s;
 	"""
-	cur.execute(sql, data)
+	cur.execute( sql, data )
+

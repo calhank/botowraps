@@ -15,7 +15,6 @@ def gzc(filename):
 		    shutil.copyfileobj(fi, fo)
 	return fo_name
 
-
 def split_csv_by_row(filename, rows_per_file=10000, target_dir=None, header_action="na"):
 	"""method that takes .csv file and splits it by rows into smaller files with a suffix .n after the filename. Assumes at most 1 header row"""
 	## input error handling
@@ -68,15 +67,4 @@ def split_csv_by_row(filename, rows_per_file=10000, target_dir=None, header_acti
 		out.close()
 
 	return output_file_list
-
-
-### DEPRECATED ###
-
-# def gz(filename, keep=True):
-# 	# method to gzip files/dirs in python3
-# 	cmd = ["gzip", "-f", filename]
-# 	if keep:
-# 		cmd.insert(2,"-k")
-# 	subprocess.call(cmd)
-# 	return(filename+".gz")
 
