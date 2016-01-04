@@ -64,7 +64,7 @@ def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter="||", quote
 		conn.commit()
 		return True
 
-def delete_by_date(conn, table, date_column="date", start_date=None, end_date=None, date_format="%Y-%m-%d", window=30, not_run=False):
+def delete_by_date(conn, table, date_column="date", start_date=None, end_date=None, date_format="%Y-%m-%d", window=30, not_run=False, params={} ):
 	"""method to delete old entries from redshift by date, dates are inclusive, default span is 31 days ago to 1 day ago"""
 
 	if end_date is None:
@@ -73,13 +73,22 @@ def delete_by_date(conn, table, date_column="date", start_date=None, end_date=No
 	if start_date is None:
 		start_date = ( datetime.strptime(end_date, date_format) - timedelta( days=window ) ).strftime(date_format)
 
-	sql = """DELETE FROM %(table)s WHERE %(date_column)s BETWEEN %(start_date)s AND %(end_date)s"""
 	data = {
 		"table": AsIs(table),
 		"date_column": AsIs(date_column),
 		"start_date": start_date,
 		"end_date": end_date,
 	}
+	
+	sql = """DELETE FROM %(table)s WHERE """
+	where = ["%(date_column)s BETWEEN %(start_date)s AND %(end_date)s"]
+
+	for param in params:
+		where.append("%%(%s_col)s = %%(%s_val)s" % (param, param))
+		data[param+"_col"] = AsIs(param)
+		data[param+"_val"] = params[param]
+
+	sql += " AND ".join(where)
 
 	cur = conn.cursor()
 	if not_run:
