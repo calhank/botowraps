@@ -18,16 +18,16 @@ def redshift_connection(conf):
 	return pg2.connect( **conf )
 
 
-def copy_from_s3_to_redshift(conn, s3credentials, bucketname, keyname, table, delimiter="||", quote_char="\"", na_string=None, header_rows=0, date_format="auto", compression=None, not_run=False):
+def copy_from_s3_to_redshift(conn, s3conf, bucketname, keyname, table, delimiter="||", quote_char="\"", na_string=None, header_rows=0, date_format="auto", compression=None, not_run=False):
 
-	# expects s3credentials as `dict` with keys "access_key_id" and "secret_access_key" defined
-	# e.g. {"access_key_id":"ASDFHAS", "secret_access_key":"ASBDSKJA"}
+	# expects s3conf as `dict` with keys "aws_access_key_id" and "aws_secret_access_key" defined
+	# e.g. {"aws_access_key_id":"ASDFHAS", "aws_secret_access_key":"ASBDSKJA"}
 
 	sql = """COPY %(table)s FROM 's3://%(file_location)s' CREDENTIALS 'aws_access_key_id=%(access)s;aws_secret_access_key=%(secret)s' """
 
 	data = {
-		"access": AsIs(s3credentials["access_key_id"]),
-		"secret": AsIs(s3credentials["secret_access_key"]),
+		"access": AsIs(s3conf["aws_access_key_id"]),
+		"secret": AsIs(s3conf["aws_secret_access_key"]),
 		"table": AsIs(table),
 		"file_location": AsIs(os.path.join(bucketname, keyname))
 		}

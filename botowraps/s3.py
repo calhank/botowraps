@@ -14,7 +14,7 @@ import multiprocessing
 from boto.s3.connection import S3Connection
 
 class S3Uploader(object):
-	def __init__(self, credentials, bucketname, threads=1, chunksize_mb=5, attempt_limit=5, timeout=10800):
+	def __init__(self, s3conf, bucketname, threads=1, chunksize_mb=5, attempt_limit=5, timeout=10800):
 		self.bucketname = bucketname # s3 bucket name
 		self.chunksize = int(chunksize_mb * 2**20) # get chunksize in bytes
 		self.attempt_limit = attempt_limit # default 5 attempts per chunk
@@ -22,16 +22,16 @@ class S3Uploader(object):
 		if threads <= 0:
 			raise ValueError("threads must be > 0")
 		self.threads = threads # number of parallel threads for upload
-		self.credentials = (credentials["access_key_id"], credentials["secret_access_key"]) # expects credentials as `dict` with keys "access_key_id" and "secret_access_key" defined
+		self.s3conf = s3conf # expects s3conf as `dict` with keys "aws_access_key_id" and "aws_secret_access_key" defined
 
 	def kill_old_multipart_uploads(self):
-		conn = S3Connection(*self.credentials)
+		conn = S3Connection(**self.s3conf)
 		bucket = conn.get_bucket( self.bucketname, validate=False)
 		for mp in bucket.get_all_multipart_uploads():
 			mp.cancel_upload()
 
 	def delete(self, keynames):
-		conn = S3Connection(*self.credentials)
+		conn = S3Connection(**self.s3conf)
 		bucket = conn.get_bucket( self.bucketname, validate=False)
 		logging.info("Deleting keys: %s" % keynames)
 		return bucket.delete_keys(keynames)
@@ -86,7 +86,7 @@ class S3Uploader(object):
 		if keyname is None:
 			keyname = os.path.basename(filename) # shorten keyname
 
-		conn = S3Connection( *self.credentials ) # s3 connection
+		conn = S3Connection( **self.s3conf ) # s3 connection
 		bucket = conn.get_bucket( self.bucketname, validate=False )
 		
 		fsize = os.stat(filename).st_size
