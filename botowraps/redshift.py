@@ -23,8 +23,6 @@ def copy_from_s3_to_redshift(conn, s3credentials, bucketname, keyname, table, de
 	# expects s3credentials as `dict` with keys "access_key_id" and "secret_access_key" defined
 	# e.g. {"access_key_id":"ASDFHAS", "secret_access_key":"ASBDSKJA"}
 
-	try:
-
 	sql = """COPY %(table)s FROM 's3://%(file_location)s' CREDENTIALS 'aws_access_key_id=%(access)s;aws_secret_access_key=%(secret)s' """
 
 	data = {

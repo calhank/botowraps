@@ -16,7 +16,7 @@ def gzc(filename):
 	return fo_name
 
 
-def split_csv_by_rows(filename, rows_per_file=10000, target_dir=None, header_action="na"):
+def split_csv_by_row(filename, rows_per_file=10000, target_dir=None, header_action="na"):
 	"""method that takes .csv file and splits it by rows into smaller files with a suffix .n after the filename. Assumes at most 1 header row"""
 	## input error handling
 	header_opts = ["delete","keep", "na"]
