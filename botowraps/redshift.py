@@ -12,9 +12,14 @@ import psycopg2 as pg2
 from psycopg2.extensions import AsIs
 
 def redshift_connection(conf):
-	# assuming conf as json with keys "host","user","password","port","database"
-	with open(conf, 'r') as conf:
-		conf = json.load(conf)
+	# assuming conf as json file or dict with keys 'host','user','password','port','database'
+	if type(conf) == str:
+		with open(conf, 'r') as conf:
+			conf = json.load(conf)
+	elif type(conf) == dict:
+		pass
+	else:
+		raise ValueError("conf must be the path to a file with valid JSON or a python dict object containing the keys [ 'host','user','password','port','database' ]")
 	return pg2.connect( **conf )
 
 
@@ -84,7 +89,7 @@ def delete_by_date(conn, table, date_column="date", start_date=None, end_date=No
 	where = ["%(date_column)s BETWEEN %(start_date)s AND %(end_date)s"]
 
 	for param in params:
-		where.append("%%(%s_col)s = %%(%s_val)s" % (param, param))
+		where.append("%%({p}_col)s = %%({p}_val)s".format(param))
 		data[param+"_col"] = AsIs(param)
 		data[param+"_val"] = params[param]
 
