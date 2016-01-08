@@ -89,7 +89,7 @@ def delete_by_date(conn, table, date_column="date", start_date=None, end_date=No
 	where = ["%(date_column)s BETWEEN %(start_date)s AND %(end_date)s"]
 
 	for param in params:
-		where.append("%%({param}_col)s = %%({param}_val)s".format(param))
+		where.append("%%({}_col)s = %%({}_val)s".format(param))
 		data[param+"_col"] = AsIs(param)
 		data[param+"_val"] = params[param]
 
