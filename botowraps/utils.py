@@ -7,12 +7,13 @@ import shutil
 import subprocess
 
 # functions
-def gzc(filename):
+def gzc(filename, remove=False):
 	# from gzip documentation
 	fo_name = filename+".gz"
 	with open(filename, 'rb') as fi:
 		with gzip.open(fo_name, 'wb') as fo:
 		    shutil.copyfileobj(fi, fo)
+	if remove: os.unlink(filename)
 	return fo_name
 
 def split_csv_by_row(filename, rows_per_file=10000, target_dir=None, header_action="na"):
