@@ -13,7 +13,7 @@ def gzc(filename, target_dir=None, remove=False):
 	if target_dir is None:
 		target_dir = os.path.dirname(os.path.abspath(filename))
 
-	fo_name = os.path.join( target_dir, filename+".gz" )
+	fo_name = os.path.join( target_dir, os.path.basename(filename)+".gz" )
 	with open(filename, 'rb') as fi:
 		with gzip.open(fo_name, 'wb') as fo:
 		    shutil.copyfileobj(fi, fo)
