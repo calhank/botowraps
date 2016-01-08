@@ -7,9 +7,13 @@ import shutil
 import subprocess
 
 # functions
-def gzc(filename, remove=False):
-	# from gzip documentation
-	fo_name = filename+".gz"
+def gzc(filename, remove=False, target_dir=None):
+	# adapted from gzip documentation
+
+	if target_dir is None:
+		target_dir = os.path.dirname(os.path.abspath(filename))
+
+	fo_name = os.path.join( target_dir, filename+".gz" )
 	with open(filename, 'rb') as fi:
 		with gzip.open(fo_name, 'wb') as fo:
 		    shutil.copyfileobj(fi, fo)
