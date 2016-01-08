@@ -103,7 +103,7 @@ def delete_by_date(conn, table, date_column="date", start_date=None, end_date=No
 		conn.commit()
 		return True
 
-def upsert(conn, s3conf, bucketname, keyname, table, unique_key="id", delimiter="\t", quote_char="\"", na_string="NA"):
+def upsert(conn, s3conf, bucketname, keyname, table, unique_key="id", delimiter="\t", quote_char="\"", na_string="NA", compression=None):
 
 	update_table = table+"_updates"
 
@@ -119,7 +119,7 @@ def upsert(conn, s3conf, bucketname, keyname, table, unique_key="id", delimiter=
 	cur.execute( sql, data )
 
 	# insert data into new temp table
-	copy_from_s3( conn=conn, s3conf=s3conf, bucketname=bucketname, keyname=keyname, table=update_table, delimiter=delimiter, quote_char=quote_char, na_string=na_string)
+	copy_from_s3( conn=conn, s3conf=s3conf, bucketname=bucketname, keyname=keyname, table=update_table, delimiter=delimiter, quote_char=quote_char, na_string=na_string, compression=compression)
 
 	# upsert data from temp table into original table, drop temp table
 	sql = """

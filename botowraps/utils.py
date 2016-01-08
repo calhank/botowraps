@@ -7,7 +7,7 @@ import shutil
 import subprocess
 
 # functions
-def gzc(filename, remove=False, target_dir=None):
+def gzc(filename, target_dir=None, remove=False):
 	# adapted from gzip documentation
 
 	if target_dir is None:
