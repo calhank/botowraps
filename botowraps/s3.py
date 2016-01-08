@@ -15,6 +15,7 @@ from boto.s3.connection import S3Connection
 
 class S3Uploader(object):
 	def __init__(self, s3conf, bucketname, threads=1, chunksize_mb=5, attempt_limit=5, timeout=10800):
+		self.s3conf = s3conf # expects s3conf as `dict` with keys "aws_access_key_id" and "aws_secret_access_key" defined
 		self._check_bucket(bucketname) # s3 bucket name
 		self.chunksize = int(chunksize_mb * 2**20) # get chunksize in bytes
 		self.attempt_limit = attempt_limit # default 5 attempts per chunk
@@ -22,7 +23,6 @@ class S3Uploader(object):
 		if threads <= 0: # number of threads
 			raise ValueError("threads must be > 0")
 		self.threads = threads # number of parallel threads for upload
-		self.s3conf = s3conf # expects s3conf as `dict` with keys "aws_access_key_id" and "aws_secret_access_key" defined
 
 	def _get_bucket(self, validate=False):
 		conn = S3Connection(**self.s3conf)
