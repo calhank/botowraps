@@ -51,14 +51,14 @@ class S3Uploader(object):
 
 		while sbyte < fsize: # while the starting byte is less than the total number of bytes
 			nbytes = min( [ self.chunksize, fsize - sbyte ] ) # number of bytes in chunk
-			yield ( self.credentials, mp_id, self.bucketname, filename, self.attempt_limit, chunk_num, sbyte, nbytes )
+			yield ( mp_id, self.bucketname, filename, self.attempt_limit, chunk_num, sbyte, nbytes )
 			chunk_num += 1
 			sbyte += nbytes # move starting byte to next position
 
 	def _upload_part(self,args):
 		"""Multipart Upload multiprocessing worker function, reads chunk from file and sends to S3"""
 		# unpack arguments
-		(credentials, mp_id, bucketname, filename, attempt_limit, chunk_num, sbyte, nbytes) = args
+		(mp_id, bucketname, filename, attempt_limit, chunk_num, sbyte, nbytes) = args
 		attempts=0
 		success=False
 		while attempts < attempt_limit and not success: # keep trying upload until success or limit reached
@@ -107,7 +107,7 @@ class S3Uploader(object):
 
 			fchunks = self._file_chunker(mp.id, filename) # create file chunk generator
 
-			if threads == 1:
+			if self.threads == 1:
 				# does not spawn any worker processes, safe for use in multithreaded application
 				result = []
 				try:
@@ -115,13 +115,13 @@ class S3Uploader(object):
 						part_result = self._upload_part(chunk)
 						result.append(part_result) # log to results
 						if part_result[1] == False: # if upload fails, break loop
-							logging.warning("%s failed to upload. Cancelling Multipart Upload." % keyname)
+							logging.warning("%s part failed to upload. Cancelling Multipart Upload." % keyname)
 							mp.cancel_upload()
-							return False
+							return None
 				except Exception as exc:
-					logging.warning("%s failed to upload. Cancelling Multipart Upload." % keyname)
+					logging.warning("%s failed to upload - general. Cancelling Multipart Upload." % keyname, exc)
 					mp.cancel_upload()
-					return False
+					return None
 
 			else:
 				# spawns multiprocessing worker processes, cannot be used within a Process or Thread object because of GIL. Drop thread count to 1.
@@ -137,14 +137,14 @@ class S3Uploader(object):
 				except Exception as exc:
 					logging.warning("%s failed to upload. Cancelling Multipart Upload." % keyname)
 					mp.cancel_upload()
-					return False
+					return None
 
 			# ensure all chunks uploaded successfully, or cancel upload if success=False for any value
 			for chunk_num, success in result:
 				if not success:
 					logging.warning("Chunk %s failed to upload" % chunk_num)
 					mp.cancel_upload()
-					return False
+					return None
 
 			# ensure S3 has collected all parts of upload, compare to number of chunks uploaded
 			if len(mp.get_all_parts()) == len(result):
@@ -154,14 +154,14 @@ class S3Uploader(object):
 				except Exception as exc:
 					mp.cancel_upload()
 					logging.warning("%s failed to upload compltely. Cancelling Multipart Upload." % keyname)
-					return False
+					return None
 			else:
 				mp.cancel_upload()
 				logging.warning("%s failed to upload completely. Cancelling Multipart Upload." % keyname)
-				return False
+				return None
 
 		end_time = time.time()
 		upload_speed_mbps = ( fsize / 2 **20 ) / ( end_time - start_time )
 
 		logging.info("Upload Speed: %f MB/s" % ( upload_speed_mbps ))
-		return True
+		return keyname
