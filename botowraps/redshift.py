@@ -25,6 +25,10 @@ def redshift_connection(conf):
 
 def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter="||", quote_char="\"", na_string=None, header_rows=0, date_format="auto", compression=None, not_run=False):
 
+	if isinstance(s3conf,str):
+		with open(s3conf) as fi:
+			s3conf = json.load(fi)
+
 	# expects s3conf as `dict` with keys "aws_access_key_id" and "aws_secret_access_key" defined
 	# e.g. {"aws_access_key_id":"ASDFHAS", "aws_secret_access_key":"ASBDSKJA"}
 
