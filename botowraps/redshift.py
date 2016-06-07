@@ -140,3 +140,11 @@ def upsert(conn, s3conf, bucketname, keyname, table, unique_key="id", delimiter=
 	"""
 	cur.execute( sql, data )
 
+def vacuum_analyze(conn):
+	logging.info("Running Vacuum/Analyze on Redshift")
+	iso_lvl = conn.isolation_level
+	conn.set_isolation_level(0) # isolation to 0 allows queries like vacuum which do not occur within a transaction block
+	rcur = conn.cursor()
+	rcur.execute("vacuum;analyze;")
+	conn.commit()
+	conn.set_isolation_level(iso_lvl) # reset to original setting
