@@ -23,7 +23,7 @@ def redshift_connection(conf):
 	return pg2.connect( **conf )
 
 
-def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter="||", quote_char="\"", na_string=None, header_rows=0, date_format="auto", compression=None, not_run=False):
+def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter="||", quote_char="\"", na_string=None, header_rows=0, date_format="auto", compression=None, explicit_ids=False, not_run=False):
 
 	if isinstance(s3conf,str):
 		with open(s3conf) as fi:
@@ -64,6 +64,9 @@ def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter="||", quote
 	if compression is not None:
 		if compression.upper() in set(("GZIP","LZOP")):
 			sql += compression.upper() +" "
+
+	if explicit_ids:
+		sql += "EXPLICIT_IDS "
 
 	cur = conn.cursor()
 	if not_run:
