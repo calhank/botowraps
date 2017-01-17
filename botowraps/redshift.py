@@ -80,14 +80,15 @@ def delete(conn, table, not_run=False, params={} ):
 		"table": AsIs(table),
 	}
 	
-	sql = """DELETE FROM %(table)s WHERE """
+	sql = """DELETE FROM %(table)s"""
 	where = []
 	for param in params:
 		where.append("%({}_col)s = %({}_val)s".format(param,param))
 		data[param+"_col"] = AsIs(param)
 		data[param+"_val"] = params[param]
 
-	sql += " AND ".join(where)
+	if len(where) > 0:
+		sql += " WHERE " + " AND ".join(where)
 
 	cur = conn.cursor()
 	if not_run:
