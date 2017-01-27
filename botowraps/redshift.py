@@ -4,10 +4,12 @@
 import os
 import sys
 import json
+import re
 import logging
 from datetime import datetime, timedelta
 
 # third party lib imports
+import pandas as pd
 import psycopg2 as pg2
 from psycopg2.extensions import AsIs
 
@@ -23,7 +25,77 @@ def redshift_connection(conf):
 	return pg2.connect( **conf )
 
 
-def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter="||", quote_char="\"", na_string=None, header_rows=0, date_format="auto", compression=None, explicit_ids=False, not_run=False):
+def select(conn, sql, to_df=True, header=True, max_rows=100000):
+
+	"""Executes SELECT statements, and outputs to nested list or DataFrame"""
+
+	# lowercase the SQL statement to make parsing easier. This does not affect execution in Redshift.
+	sql = sql.lower()
+
+	# ensure 'sql' is a SELECT statement
+	if sql.split(" ")[0] != 'select':
+		raise ValueError("'sql' argument must start with a SELECT statement.")
+
+	# ensure there are no other operations except SELECT queries
+	illegal_ops_re = re.compile(r'(delete|update|drop|insert)')
+	illegal_ops_match = illegal_ops_re.search(sql)
+	if illegal_ops_match:
+		raise ValueError("'sql' contains illegal operation: {}. This function can only execute SELECT queries.".format(illegal_ops_match.group(0).upper()))
+
+	# get table name and column names from 'sql'
+	table_re = re.compile(r'(?<=from )[A-Za-z0-9\_]+(?=^|\s|\;|$)')
+	column_re = re.compile(r'(?<=select )[A-Za-z0-9\s\_*\\(\),]+(?= from)')
+
+	tmatch = table_re.search(sql)
+	if tmatch:
+		table = tmatch.group(0)
+	else:
+		raise ValueError("No table name found in 'sql' argument")
+	
+	cmatch = column_re.search(sql)
+	columns = []
+	if cmatch:
+		csplit = cmatch.group(0).split(',')
+		for col in csplit:
+			is_wildcard = col.replace(' ','') == "*"
+			# if there's a wildcard in the columns, query pg_table_def to get column names and order
+			if is_wildcard:
+				cur = conn.cursor()
+				cur.execute("""SELECT "column" FROM pg_table_def WHERE tablename=%(table)s""", {"table":table})
+				columns += [x[0] for x in cur.fetchall()]
+				cur.close()
+			else:
+				# if columns are renamed in query using the 'AS' operation, use the string given after 'AS'.
+				# Otherwise, use column name as is
+				as_split = col.split(' as ')
+				if len(as_split) > 1: # this can only be greater than 1 if there is an 'AS' operation
+					columns.append(as_split[-1].replace(' ',''))
+				else:
+					columns.append(col.replace(' ',''))
+
+	cur = conn.cursor()
+	cur.execute(sql)
+	if cur.rowcount <= max_rows:
+		
+		data = [list(x) for x in cur.fetchall()]
+
+		if not to_df: # return as list of lists
+			if header:
+				data = columns + data
+			return data
+		else: # return as pandas DataFrame
+			if header:
+				df = pd.DataFrame(data, columns=columns)
+			else:
+				df = pd.DataFrame(data)
+			return(df)
+	else:
+		raise ValueError('Query resulted in too many rows of data to output: {}. Increase max_rows parameter ({}) and try again.'.format(cur.rowcount,max_rows))
+	cur.close()
+	return None
+
+
+def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter=",", quote_char="\"", na_string=None, header_rows=0, date_format="auto", compression=None, explicit_ids=False, not_run=False):
 
 	if isinstance(s3conf,str):
 		with open(s3conf) as fi:
@@ -67,6 +139,62 @@ def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter="||", quote
 
 	if explicit_ids:
 		sql += "EXPLICIT_IDS "
+
+	cur = conn.cursor()
+	if not_run:
+		return cur.mogrify(sql, data)
+	else:
+		cur.execute(sql, data)
+		conn.commit()
+		return True
+
+def unload_into_s3(conn, s3conf, bucketname, keyname, table=None, select_statement=None, delimiter=",", escape_char = "\\", quote_char="\"", na_string=None, compression=None, allow_overwrite=False, parallel=True, not_run=False):
+
+	# one of table or select_statement must be defined. select_statement overrides table. If only table is given, select_statement is defined as 'select * from <table>'
+	if table is None and select_statement is None:
+		raise ValueError('One of \'table\' or \'select_statement\' arguments must be given.')
+	elif table is not None and select_statement is None:
+		select_statement = 'SELECT * FROM ' + table
+
+	if isinstance(s3conf,str):
+		with open(s3conf) as fi:
+			s3conf = json.load(fi)
+
+	# expects s3conf as `dict` with keys "aws_access_key_id" and "aws_secret_access_key" defined
+	# e.g. {"aws_access_key_id":"ASDFHAS", "aws_secret_access_key":"ASBDSKJA"}
+
+	sql = """UNLOAD '%(select_statement)s' TO 's3://%(file_location)s' CREDENTIALS 'aws_access_key_id=%(access)s;aws_secret_access_key=%(secret)s' """
+
+	data = {
+		"access": AsIs(s3conf["aws_access_key_id"]),
+		"secret": AsIs(s3conf["aws_secret_access_key"]),
+		"select_statement": AsIs(select_statement),
+		"file_location": AsIs(os.path.join(bucketname, keyname))
+		}
+
+	if na_string is not None:
+		sql += "NULL %(na_string)s "
+		data["na_string"] = na_string
+
+	if delimiter is not None:
+		sql += "DELIMITER %(delimiter)s "
+		data["delimiter"] = delimiter
+
+	if quote_char is not None:
+		sql += "CSV QUOTE %(quote_char)s "
+		data["quote_char"] = quote_char
+
+	if compression is not None:
+		if compression.upper() in set(("GZIP","LZOP")):
+			sql += compression.upper() +" "
+
+	if allow_overwrite:
+		sql += "ALLOWOVERWRITE "
+
+	if parallel:
+		sql += "PARALLEL TRUE "
+	else:
+		sql += "PARALLEL FALSE "
 
 	cur = conn.cursor()
 	if not_run:
