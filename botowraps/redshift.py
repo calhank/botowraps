@@ -150,7 +150,7 @@ def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter=",", quote_
         return True
 
 
-def unload_into_s3(conn, s3conf, bucketname, keyname, table=None, select_statement=None, delimiter=",", escape_char="\\", quote_char="\"", na_string=None, compression=None, allow_overwrite=False, parallel=True, not_run=False):
+def unload_into_s3(conn, s3conf, bucketname, keyname, table=None, select_statement=None, select_data={}, delimiter=",", escape_char="\\", quote_char="\"", na_string=None, compression=None, allow_overwrite=False, parallel=True, not_run=False, manifest=False):
 
     # one of table or select_statement must be defined. select_statement overrides table. If only table is given, select_statement is defined as 'select * from <table>'
     if table is None and select_statement is None:
@@ -165,7 +165,7 @@ def unload_into_s3(conn, s3conf, bucketname, keyname, table=None, select_stateme
     # expects s3conf as `dict` with keys "aws_access_key_id" and "aws_secret_access_key" defined
     # e.g. {"aws_access_key_id":"ASDFHAS", "aws_secret_access_key":"ASBDSKJA"}
 
-    sql = """UNLOAD '%(select_statement)s' TO 's3://%(file_location)s' CREDENTIALS 'aws_access_key_id=%(access)s;aws_secret_access_key=%(secret)s' """
+    sql = """UNLOAD ('%(select_statement)s') TO 's3://%(file_location)s' CREDENTIALS 'aws_access_key_id=%(access)s;aws_secret_access_key=%(secret)s' """
 
     data = {
         "access": AsIs(s3conf["aws_access_key_id"]),
@@ -193,10 +193,15 @@ def unload_into_s3(conn, s3conf, bucketname, keyname, table=None, select_stateme
     if allow_overwrite:
         sql += "ALLOWOVERWRITE "
 
+    if manifest:
+        sql += "MANIFEST "
+
     if parallel:
         sql += "PARALLEL TRUE "
     else:
         sql += "PARALLEL FALSE "
+
+    data = data.update(select_data)
 
     cur = conn.cursor()
     if not_run:
