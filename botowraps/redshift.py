@@ -135,8 +135,8 @@ def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter=",", quote_
         data["quote_char"] = quote_char
 
     if compression is not None:
-        if compression.upper() in set(("GZIP","LZOP")):
-            sql += compression.upper() +" "
+        if compression.upper() in set(("GZIP", "LZOP")):
+            sql += compression.upper() + " "
 
     if explicit_ids:
         sql += "EXPLICIT_IDS "
