@@ -150,13 +150,17 @@ def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter=",", quote_
         return True
 
 
-def unload_into_s3(conn, s3conf, bucketname, keyname, table=None, select_statement=None, select_data={}, delimiter=",", escape_char="\\", quote_char="\"", na_string=None, compression=None, allow_overwrite=False, parallel=True, not_run=False, manifest=False):
+def unload_into_s3(conn, s3conf, bucketname, keyname, table=None, select_statement=None, select_data={}, delimiter=",", escape_char="\\", na_string=None, compression=None, allow_overwrite=False, parallel=True, not_run=False, manifest=False):
+
+    cur = conn.cursor()
 
     # one of table or select_statement must be defined. select_statement overrides table. If only table is given, select_statement is defined as 'select * from <table>'
     if table is None and select_statement is None:
         raise ValueError('One of \'table\' or \'select_statement\' arguments must be given.')
     elif table is not None and select_statement is None:
         select_statement = 'SELECT * FROM ' + table
+
+    select_statement = str(cur.mogrify(select_statement, select_data), 'utf-8')
 
     if isinstance(s3conf, str):
         with open(s3conf) as fi:
@@ -165,12 +169,12 @@ def unload_into_s3(conn, s3conf, bucketname, keyname, table=None, select_stateme
     # expects s3conf as `dict` with keys "aws_access_key_id" and "aws_secret_access_key" defined
     # e.g. {"aws_access_key_id":"ASDFHAS", "aws_secret_access_key":"ASBDSKJA"}
 
-    sql = """UNLOAD ('%(select_statement)s') TO 's3://%(file_location)s' CREDENTIALS 'aws_access_key_id=%(access)s;aws_secret_access_key=%(secret)s' """
+    sql = "UNLOAD (%(select_statement)s) TO 's3://%(file_location)s' CREDENTIALS 'aws_access_key_id=%(access)s;aws_secret_access_key=%(secret)s' "
 
     data = {
         "access": AsIs(s3conf["aws_access_key_id"]),
         "secret": AsIs(s3conf["aws_secret_access_key"]),
-        "select_statement": AsIs(select_statement),
+        "select_statement": select_statement,
         "file_location": AsIs(os.path.join(bucketname, keyname))
     }
 
@@ -182,9 +186,9 @@ def unload_into_s3(conn, s3conf, bucketname, keyname, table=None, select_stateme
         sql += "DELIMITER %(delimiter)s "
         data["delimiter"] = delimiter
 
-    if quote_char is not None:
-        sql += "CSV QUOTE %(quote_char)s "
-        data["quote_char"] = quote_char
+    # if quote_char is not None:
+    #     sql += "CSV QUOTE %(quote_char)s "
+    #     data["quote_char"] = quote_char
 
     if compression is not None:
         if compression.upper() in set(("GZIP", "LZOP")):
@@ -201,9 +205,8 @@ def unload_into_s3(conn, s3conf, bucketname, keyname, table=None, select_stateme
     else:
         sql += "PARALLEL FALSE "
 
-    data = data.update(select_data)
+    # data.update(select_data)
 
-    cur = conn.cursor()
     if not_run:
         return cur.mogrify(sql, data)
     else:
