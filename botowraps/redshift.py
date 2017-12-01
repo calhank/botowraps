@@ -186,10 +186,6 @@ def unload_into_s3(conn, s3conf, bucketname, keyname, table=None, select_stateme
         sql += "DELIMITER %(delimiter)s "
         data["delimiter"] = delimiter
 
-    # if quote_char is not None:
-    #     sql += "CSV QUOTE %(quote_char)s "
-    #     data["quote_char"] = quote_char
-
     if compression is not None:
         if compression.upper() in set(("GZIP", "LZOP")):
             sql += compression.upper() + " "
@@ -204,8 +200,6 @@ def unload_into_s3(conn, s3conf, bucketname, keyname, table=None, select_stateme
         sql += "PARALLEL TRUE "
     else:
         sql += "PARALLEL FALSE "
-
-    # data.update(select_data)
 
     if not_run:
         return cur.mogrify(sql, data)
