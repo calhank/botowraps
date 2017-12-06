@@ -96,7 +96,7 @@ def select(conn, sql, to_df=True, header=True, max_rows=100000):
     return None
 
 
-def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter=",", quote_char="\"", na_string=None, header_rows=0, date_format="auto", compression=None, explicit_ids=False, not_run=False):
+def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter=",", quote_char="\"", na_string=None, header_rows=0, date_format="auto", compression=None, explicit_ids=False, manifest=False, not_run=False):
 
     if isinstance(s3conf, str):
         with open(s3conf) as fi:
@@ -133,6 +133,9 @@ def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter=",", quote_
     if quote_char is not None:
         sql += "CSV QUOTE %(quote_char)s "
         data["quote_char"] = quote_char
+
+    if manifest:
+        sql += "MANIFEST "
 
     if compression is not None:
         if compression.upper() in set(("GZIP", "LZOP")):
@@ -197,9 +200,9 @@ def unload_into_s3(conn, s3conf, bucketname, keyname, table=None, select_stateme
         sql += "MANIFEST "
 
     if parallel:
-        sql += "PARALLEL TRUE "
+        sql += "PARALLEL ON "
     else:
-        sql += "PARALLEL FALSE "
+        sql += "PARALLEL OFF "
 
     if not_run:
         return cur.mogrify(sql, data)
