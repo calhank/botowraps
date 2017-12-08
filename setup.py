@@ -11,8 +11,8 @@ setup(name='botowraps',
             'botowraps'
       ],
       install_requires=[
-	      'boto',
-            'numpy',
-            'pandas'
+	      #'boto',
+            #'numpy',
+            #'pandas'
       ],
       zip_safe=False)
