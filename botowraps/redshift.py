@@ -96,7 +96,7 @@ def select(conn, sql, to_df=True, header=True, max_rows=100000):
     return None
 
 
-def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter=",", quote_char="\"", na_string=None, header_rows=0, date_format="auto", compression=None, explicit_ids=False, manifest=False, not_run=False):
+def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter=",", quote_char="\"", escape=True, m na_string=None, header_rows=0, date_format="auto", compression=None, explicit_ids=False, manifest=False, not_run=False):
 
     if isinstance(s3conf, str):
         with open(s3conf) as fi:
@@ -121,6 +121,9 @@ def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter=",", quote_
     if delimiter is not None:
         sql += "DELIMITER %(delimiter)s "
         data["delimiter"] = delimiter
+
+    if escape:
+        sql += "ESCAPE "
 
     if header_rows > 0:
         sql += "IGNOREHEADER %(header_rows)s "
@@ -153,7 +156,7 @@ def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter=",", quote_
         return True
 
 
-def unload_into_s3(conn, s3conf, bucketname, keyname, table=None, select_statement=None, select_data={}, delimiter=",", escape_char="\\", na_string=None, compression=None, allow_overwrite=False, parallel=True, not_run=False, manifest=False):
+def unload_into_s3(conn, s3conf, bucketname, keyname, table=None, select_statement=None, select_data={}, delimiter=",", escape=True, na_string=None, compression=None, allow_overwrite=False, parallel=True, not_run=False, manifest=False):
 
     cur = conn.cursor()
 
@@ -192,6 +195,9 @@ def unload_into_s3(conn, s3conf, bucketname, keyname, table=None, select_stateme
     if compression is not None:
         if compression.upper() in set(("GZIP", "LZOP")):
             sql += compression.upper() + " "
+
+    if escape:
+        sql += "ESCAPE "
 
     if allow_overwrite:
         sql += "ALLOWOVERWRITE "
