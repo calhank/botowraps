@@ -96,7 +96,7 @@ def select(conn, sql, to_df=True, header=True, max_rows=100000):
     return None
 
 
-def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter=",", quote_char="\"", escape=True, m na_string=None, header_rows=0, date_format="auto", compression=None, explicit_ids=False, manifest=False, not_run=False):
+def copy_from_s3(conn, s3conf, bucketname, keyname, table, delimiter=",", quote_char="\"", escape=True, na_string=None, header_rows=0, date_format="auto", compression=None, explicit_ids=False, manifest=False, not_run=False):
 
     if isinstance(s3conf, str):
         with open(s3conf) as fi:
