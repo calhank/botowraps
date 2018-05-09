@@ -228,9 +228,14 @@ def delete(conn, table, not_run=False, params={}):
     sql = """DELETE FROM %(table)s"""
     where = []
     for param in params:
-        where.append("%({}_col)s = %({}_val)s".format(param, param))
-        data[param + "_col"] = AsIs(param)
-        data[param + "_val"] = params[param]
+        if isinstance(params[param], str):
+            where.append("%({}_col)s = %({}_val)s".format(param, param))
+            data[param + "_col"] = AsIs(param)
+            data[param + "_val"] = params[param]
+        elif isinstance(params[param], list):
+            where.append("%({}_col)s in (%({}_val)s)".format(param, param))
+            data[param + "_col"] = AsIs(param)
+            data[param + "_val"] = AsIs(','.join(["'{}'".format(p) for p in params[param]]))
 
     if len(where) > 0:
         sql += " WHERE " + " AND ".join(where)
@@ -271,7 +276,7 @@ def delete_by_date(conn, table, date_column="date", start_date=None, end_date=No
         elif isinstance(params[param], list):
             where.append("%({}_col)s in (%({}_val)s)".format(param, param))
             data[param + "_col"] = AsIs(param)
-            data[param + "_val"] = ','.join(["'{}'".format(p) for p in params[param]])
+            data[param + "_val"] = AsIs(','.join(["'{}'".format(p) for p in params[param]]))
 
     sql += " AND ".join(where)
 
