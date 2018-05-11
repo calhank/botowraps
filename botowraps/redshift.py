@@ -229,12 +229,12 @@ def delete(conn, table, not_run=False, params={}):
     where = []
     for param in params:
         data[param + "_col"] = AsIs(param)
-        if isinstance(params[param], str):
-            where.append("%({}_col)s = %({}_val)s".format(param, param))
-            data[param + "_val"] = params[param]
-        elif isinstance(params[param], list):
+        if isinstance(params[param], list):
             where.append("%({}_col)s in (%({}_val)s)".format(param, param))
             data[param + "_val"] = AsIs(','.join(["'{}'".format(p) for p in params[param]]))
+        else:
+            where.append("%({}_col)s = %({}_val)s".format(param, param))
+            data[param + "_val"] = params[param]
 
     if len(where) > 0:
         sql += " WHERE " + " AND ".join(where)
@@ -269,12 +269,12 @@ def delete_by_date(conn, table, date_column="date", start_date=None, end_date=No
 
     for param in params:
         data[param + "_col"] = AsIs(param)
-        if isinstance(params[param], str):
-            where.append("%({}_col)s = %({}_val)s".format(param, param))
-            data[param + "_val"] = params[param]
-        elif isinstance(params[param], list):
+        if isinstance(params[param], list):
             where.append("%({}_col)s in (%({}_val)s)".format(param, param))
             data[param + "_val"] = AsIs(','.join(["'{}'".format(p) for p in params[param]]))
+        else:
+            where.append("%({}_col)s = %({}_val)s".format(param, param))
+            data[param + "_val"] = params[param]
 
     sql += " AND ".join(where)
 
